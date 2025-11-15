@@ -6,63 +6,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Cada instância terá um IP diferente do GitHub Actions
-        instance: [1, 2, 3, 4, 5]
-      max-parallel: 5  # Executar simultaneamente
-    
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git
-      
-      - name: Clone Thermoptic
-        run: |
-          git clone https://github.com/mandatoryprogrammer/thermoptic.git
-          cd thermoptic
-      
-      - name: Install Thermoptic dependencies
-        run: |
-          cd thermoptic
-          python3 -m pip install -r requirements.txt
-      
-      - name: Install sprayer dependencies
+
+      - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
-      
-      - name: Start Thermoptic proxy in background
+
+      - name: Start Local Proxy Service (Docker Compose)
+        # O Docker e o Docker Compose já vêm pré-instalados nos runners do GitHub,
+        # então removemos todos os comandos de 'sudo apt install'.
+        # Usamos a flag -d (--detach) para rodar o serviço em background.
         run: |
-          cd thermoptic
-          # Inicia o proxy na porta 8080
-          nohup python3 thermoptic.py --port 8080 > thermoptic.log 2>&1 &
-          sleep 5  # Aguarda o proxy iniciar
-          echo "Thermoptic proxy iniciado"
-      
-      - name: Verify proxy is running
-        run: |
-          curl -x http://127.0.0.1:8080 -I https://www.google.com || echo "Proxy check failed"
-      
-      - name: Run sprayer script
+          docker compose up --build -d
+          # Opcional: dê um pequeno tempo para o proxy iniciar
+          echo "Waiting for proxy service to start..."
+          sleep 15
+
+      # O proxy estará disponível em 127.0.0.1 (ou localhost) na porta definida no seu docker-compose.yml.
+      - name: Run Sprayer Script using Local Proxy
         run: python sprayer.py
         env:
+          # Variáveis para o Sprayer: O Sprayer (sprayer.py) deve ser codificado para
+          # ler e usar essas variáveis de ambiente para rotear o tráfego de saída.
+          HTTP_PROXY: http://changeme:changeme@127.0.0.1:1234
           USERNAMES: ${{ secrets.USERNAMES }}
           PASSWORD: ${{ secrets.PASSWORD }}
           CATCHERURL: ${{ secrets.CATCHERURL }}
           CATCHERTLS: ${{ secrets.CATCHERTLS }}
-          PROXY_HOST: "127.0.0.1"
-          PROXY_PORT: "8080"
-          INSTANCE_ID: ${{ matrix.instance }}
-      
-      - name: Show Thermoptic logs (on failure)
-        if: failure()
-        run: |
-          echo "=== Thermoptic Logs ==="
-          cat thermoptic/thermoptic.log || echo "No logs found"
