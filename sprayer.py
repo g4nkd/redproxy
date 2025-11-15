@@ -30,7 +30,7 @@ def send_login_request():
             url,
             headers=post_headers,
             # ATENÇÃO: Proxy hardcoded com credenciais de placeholder (changeme) - Mudar!
-            proxies={"http": "http://changeme:changeme@127.0.0.1:1234"},
+            proxies={"https": "http://changeme:changeme@127.0.0.1:1234"},
             timeout=5,
         )
         return response.status_code, response.text
