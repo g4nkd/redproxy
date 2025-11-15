@@ -1,4 +1,4 @@
-name: Sprayer com Thermoptic Proxy
+name: Sprayer
 
 on:
   workflow_dispatch:
