@@ -19,7 +19,7 @@ catcher_uses_TLS_str = os.getenv("CATCHERTLS")
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
 def send_login_request(username, password):
-    url = "http://18.234.239.10:8888/common/oauth2/token"
+    url = "https://login.microsoft.com/common/oauth2/token"
     body_params = {
         "resource": "https://graph.windows.net",
         "client_id": "1b730954-1685-4b74-9bfd-dac224a7b894",
