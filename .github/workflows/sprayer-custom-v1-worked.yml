@@ -23,6 +23,7 @@ jobs:
           echo "[*] Clonando Thermoptic..."
           git clone https://github.com/raceconditionss/thermoptic-working
           cd thermoptic-working
+          git switch -c 50567634e30154dd73d759d923c655c8669ab75e
           
           echo "[*] Iniciando proxy via Docker Compose..."
           docker compose up --build -d
