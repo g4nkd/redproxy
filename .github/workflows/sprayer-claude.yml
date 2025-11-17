@@ -1,4 +1,4 @@
-name: Sprayer claude
+name: Sprayer
 
 on:
   workflow_dispatch:
