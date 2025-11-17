@@ -38,7 +38,7 @@ jobs:
       - name: Test Proxy Connection
         run: |
           echo "[*] Testando conexão com proxy..."
-          curl -v --proxy http://changeme:changeme@localhost:1234 https://ja4db.com/id/ja4/ || echo "Proxy test failed"
+          curl -v --proxy http://changeme:changeme@localhost:1234 https://ja4db.com/id/ja4/ --insecure || echo "Proxy test failed"
       
       - name: Run Sprayer
         run: python3 sprayer.py
