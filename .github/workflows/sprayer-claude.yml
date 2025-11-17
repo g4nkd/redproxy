@@ -1,0 +1,67 @@
+name: Sprayer com Proxy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: python3 -m pip install -r requirements.txt
+      
+      - name: Clone and Start Thermoptic Proxy
+        run: |
+          echo "[*] Clonando Thermoptic..."
+          git clone https://github.com/mandatoryprogrammer/thermoptic.git
+          cd thermoptic
+          git checkout 50567634e30154dd73d759d923c655c8669ab75e
+          
+          echo "[*] Iniciando proxy via Docker Compose..."
+          docker compose up --build -d
+          
+          echo "[+] Aguardando proxy ficar pronto..."
+          sleep 10
+          
+          echo "[+] Proxy Thermoptic iniciado"
+          docker compose ps
+          docker compose logs
+      
+      - name: Test Proxy Connection
+        run: |
+          echo "[*] Testando conexão com proxy..."
+          curl -v --proxy http://changeme:changeme@localhost:1234 https://ja4db.com/id/ja4/ || echo "Proxy test failed"
+      
+      - name: Run Sprayer
+        run: python3 sprayer.py
+        env:
+          USERNAMES: ${{ secrets.USERNAMES }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          CATCHERURL: ${{ secrets.CATCHERURL }}
+          CATCHERTLS: ${{ secrets.CATCHERTLS }}
+          HTTP_PROXY: "http://changeme:changeme@localhost:1234"
+          HTTPS_PROXY: "http://changeme:changeme@localhost:1234"
+          INSTANCE_ID: ${{ github.run_id }}
+      
+      - name: Show Proxy Logs
+        if: always()
+        run: |
+          cd thermoptic
+          echo "[*] Logs do proxy:"
+          docker compose logs
+      
+      - name: Stop Thermoptic Proxy
+        if: always()
+        run: |
+          cd thermoptic
+          echo "[*] Parando proxy Thermoptic..."
+          docker compose down
+          echo "[+] Proxy parado"
