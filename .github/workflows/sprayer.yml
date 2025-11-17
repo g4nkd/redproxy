@@ -1,4 +1,4 @@
-name: Sprayer
+name: Sprayer oficial
 
 on:
   workflow_dispatch:
