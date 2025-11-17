@@ -41,7 +41,7 @@ def send_login_request(username, password):
             url,
             headers=post_headers,
             data=body_params,
-            #proxies={"http": "http://changeme:changeme@127.0.0.1:1234"},
+            proxies={"http": "http://changeme:changeme@127.0.0.1:1234"},
             timeout=5,
         )
         return response.status_code, response.text
