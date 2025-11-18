@@ -1,23 +1,23 @@
-name: Sprayer 
- 
+name: Sprayer
+
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      
+
       - name: Install dependencies
         run: python3 -m pip install -r requirements.txt
-      
+
       - name: Clone and Start Thermoptic Proxy
         run: |
           echo "[*] Clonando Thermoptic..."
@@ -30,12 +30,29 @@ jobs:
           
           echo "[+] Proxy Thermoptic iniciado"
           docker compose ps
+          
+          echo "[*] Aguardando 15s para geração dos certificados..."
           sleep 15
           
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 --cacert ssl/rootCA.crt https://ja4db.com/id/ja4h/
-          echo "listing /thermoptic/ssl/rootCA.crt" ; ls /thermoptic/ssl/rootCA.crt
-          echo "listing /" ; ls /
-     
+          # --- CORREÇÃO DE EXTRAÇÃO DO SSL ---
+          # Tenta garantir que a pasta existe
+          mkdir -p ssl
+          
+          # Copia o certificado de dentro do container para a pasta do runner
+          # Isso resolve o problema de "No such file"
+          echo "[*] Copiando rootCA.crt do container para o host..."
+          docker cp thermoptic-thermoptic-1:/app/ssl/rootCA.crt ./ssl/rootCA.crt
+          
+          # Ajusta permissões para garantir que o Python consiga ler
+          chmod 644 ./ssl/rootCA.crt
+          
+          # Debug: Mostra que o arquivo agora existe no caminho certo
+          echo "[DEBUG] Verificando arquivo no host:"
+          ls -l $(pwd)/ssl/rootCA.crt
+          
+          # Teste rápido de conexão (opcional)
+          curl --proxy http://changeme:changeme@127.0.0.1:1234 --cacert ./ssl/rootCA.crt https://ja4db.com/id/ja4h/
+
       - name: Run Sprayer
         run: python3 sprayer.py
         env:
@@ -44,11 +61,15 @@ jobs:
           CATCHERURL: ${{ secrets.CATCHERURL }}
           CATCHERTLS: ${{ secrets.CATCHERTLS }}
           INSTANCE_ID: ${{ github.run_id }}
+          # O caminho agora aponta corretamente para a pasta onde fizemos o 'git clone' e o 'docker cp'
+          REQUESTS_CA_BUNDLE: ${{ github.workspace }}/thermoptic/ssl/rootCA.crt
 
       - name: Stop Thermoptic Proxy
         if: always()
         run: |
-          cd thermoptic
-          echo "[*] Parando proxy Thermoptic..."
-          docker compose down
-          echo "[+] Proxy parado"
+          if [ -d "thermoptic" ]; then
+            cd thermoptic
+            echo "[*] Parando proxy Thermoptic..."
+            docker compose down
+            echo "[+] Proxy parado"
+          fi
