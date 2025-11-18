@@ -1,4 +1,4 @@
-name: Sprayer 
+name: Sprayer worked
  
 on:
   workflow_dispatch:
@@ -30,17 +30,9 @@ jobs:
           
           echo "[+] Proxy Thermoptic iniciado"
           docker compose ps
-
-          echo "Setup certificate"
-          sudo cp ssl/rootCA.crt /usr/local/share/ca-certificates/rootCA.crt || echo "Step 1 -> failed"
-          sudo update-ca-certificates || echo "Step 2 -> failed"
-
-          echo "Curl proxy + insecure"
-          curl --proxy http://127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl proxy + insecure failed"
-          echo "Curl proxy"
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 https://ja4db.com/id/ja4h/ || echo "curl only proxy failed"
-          echo "Curl without proxy"
-          curl  https://ja4db.com/id/ja4h/ || echo "curl default failed"
+          sleep 15
+          curl --proxy http://changeme:changeme@127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
+          curl  https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
       
       - name: Run Sprayer
         run: python3 sprayer.py
