@@ -32,12 +32,8 @@ jobs:
           docker compose ps
           sleep 15
           
-          echo "--- TESTES DE CONEXÃO ---"
-          # Teste 1: Inseguro (deve funcionar)
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl insecure failed"
-          
-          # Teste 2: Seguro sem config (deve falhar no handshake)
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 https://ja4db.com/id/ja4h/ || echo "curl secure failed (esperado)"
+          # Debug: Verificar se o arquivo de certificado existe no caminho esperado
+          ls -la ssl/rootCA.crt
       
       - name: Run Sprayer
         run: python3 sprayer.py
@@ -47,8 +43,9 @@ jobs:
           CATCHERURL: ${{ secrets.CATCHERURL }}
           CATCHERTLS: ${{ secrets.CATCHERTLS }}
           INSTANCE_ID: ${{ github.run_id }}
-          # ADICIONADO AQUI:
-          # Aponta para o certificado dentro da pasta clonada
+          # --- A CORREÇÃO ESTÁ AQUI EMBAIXO ---
+          # O ${{ github.workspace }} pega o caminho absoluto da raiz do runner.
+          # Como clonamos a pasta "thermoptic" na raiz, o caminho é esse:
           REQUESTS_CA_BUNDLE: ${{ github.workspace }}/thermoptic/ssl/rootCA.crt
 
       - name: Stop Thermoptic Proxy
