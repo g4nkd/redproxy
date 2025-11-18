@@ -2,8 +2,8 @@
 
 This project combines two major forks:
 
-* dunderhay/git-rotate
-* mandatoryprogrammer/thermoptic
+* [dunderhay/git-rotate](https://github.com/dunderhay/git-rotate)
+* [mandatoryprogrammer/thermoptic](https://github.com/mandatoryprogrammer/thermoptic)
 
 ### Stealth Fingerprint Multilayer Spoofing
 
