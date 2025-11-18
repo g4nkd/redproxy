@@ -1,0 +1,52 @@
+name: Sprayer worked
+ 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: python3 -m pip install -r requirements.txt
+      
+      - name: Clone and Start Thermoptic Proxy
+        run: |
+          echo "[*] Clonando Thermoptic..."
+          git clone https://github.com/mandatoryprogrammer/thermoptic.git
+          cd thermoptic
+          git checkout 50567634e30154dd73d759d923c655c8669ab75e
+          
+          echo "[*] Iniciando proxy via Docker Compose..."
+          docker compose up --build -d
+          
+          echo "[+] Proxy Thermoptic iniciado"
+          docker compose ps
+          sleep 15
+          curl --proxy http://changeme:changeme@127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
+          curl  https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
+      
+      - name: Run Sprayer
+        run: python3 sprayer.py
+        env:
+          USERNAMES: ${{ secrets.USERNAMES }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          CATCHERURL: ${{ secrets.CATCHERURL }}
+          CATCHERTLS: ${{ secrets.CATCHERTLS }}
+          INSTANCE_ID: ${{ github.run_id }}
+      
+      - name: Stop Thermoptic Proxy
+        if: always()
+        run: |
+          cd thermoptic
+          echo "[*] Parando proxy Thermoptic..."
+          docker compose down
+          echo "[+] Proxy parado"
