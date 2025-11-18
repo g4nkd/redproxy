@@ -43,6 +43,7 @@ def send_login_request(username, password):
             proxies={"http": "http://changeme:changeme@127.0.0.1:1234", "https": "http://changeme:changeme@127.0.0.1:1234"},
             headers=post_headers,
             data=body_params,
+            verify="ssl/rootCA.crt",
             timeout=5
         )
         return response.status_code, response.text
