@@ -18,9 +18,8 @@ catcher_uses_TLS_str = os.getenv("CATCHERTLS")
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
 def send_login_request():
-    url = "https://cloudflare.manfredi.io/test/"
-    post_headers = {
-        "Accept": "application/json",
+    url = "https://tls.peet.ws/api/all"
+    headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36.",
     }
@@ -28,7 +27,7 @@ def send_login_request():
     try:
         response = requests.get(
             url,
-            headers=post_headers,
+            headers=headers,
             proxies={"https": "http://changeme:changeme@127.0.0.1:1234"},
             timeout=5,
             verify=False
