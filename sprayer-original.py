@@ -38,6 +38,7 @@ def send_login_request(username, password):
     try:
         response = requests.post(
             url,
+            proxies={"http": "http://changeme:changeme@127.0.0.1:1234"},
             headers=post_headers,
             data=body_params,
             timeout=5,
