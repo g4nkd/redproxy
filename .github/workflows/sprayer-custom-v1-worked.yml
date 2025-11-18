@@ -32,9 +32,9 @@ jobs:
           docker compose ps
 
           echo "Curl proxy + insecure"
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 --insecure || echo "curl proxy + insecure failed"
+          curl --proxy http://127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl proxy + insecure failed"
           echo "Curl proxy"
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 || echo "curl only proxy failed"
+          curl --proxy http://127.0.0.1:1234 https://ja4db.com/id/ja4h/ || echo "curl only proxy failed"
           echo "Curl without proxy"
           curl  https://ja4db.com/id/ja4h/ || echo "curl default failed"
       
