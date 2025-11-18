@@ -23,3 +23,7 @@ Supports:
 ### Adjustments
 
 You can adapt `catcher-microsoft-login.py` or `catcher-fingerprint.py` to customize how requests are crafted during **security research and detection-evasion testing**. These adjustments are useful for evaluating how infrastructures respond when multiple fingerprint layers and IP validation mechanisms are in place—for example, when assessing defenses against scenarios such as password spraying, brute-force attempts, or MFA validation abuse.
+
+### Demo
+We can note different IP Addresses and the same JA4 hash (impersonating chrome):
+<img width="1420" height="744" alt="image" src="https://github.com/user-attachments/assets/02a603ff-c5ae-4f4a-9e1f-47aef3a3b915" />
