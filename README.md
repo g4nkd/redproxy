@@ -7,11 +7,11 @@ This project combines two major forks:
 
 ### Stealth Fingerprint Multilayer Spoofing
 
-A research-focused tool designed for security testing, capable of simulating multiple fingerprint layers to match Chrome/Chromium behavior. It also performs IP rotation every 5 requests (via GitHub Actions).
+A research-focused tool designed for security testing, capable of simulating multiple fingerprint layers to match Chrome/Chromium behavior. It also performs IP rotation every 5 requests.
 
 Supports:
 
-* IP Rotation
+* IP Rotation (via GitHub Actions)
 * JA4 (TLS fingerprint)
 * JA4H (HTTP fingerprint)
 * JA4X (X509 certificate fingerprint)
