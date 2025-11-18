@@ -1,3 +1,4 @@
+# requestnto verify ip and some fingerprint 
 import requests
 import os
 from urllib3.exceptions import InsecureRequestWarning
