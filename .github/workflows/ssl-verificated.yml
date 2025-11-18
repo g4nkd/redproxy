@@ -44,10 +44,6 @@ jobs:
           CATCHERURL: ${{ secrets.CATCHERURL }}
           CATCHERTLS: ${{ secrets.CATCHERTLS }}
           INSTANCE_ID: ${{ github.run_id }}
-          # --- A CORREÇÃO ESTÁ AQUI EMBAIXO ---
-          # O ${{ github.workspace }} pega o caminho absoluto da raiz do runner.
-          # Como clonamos a pasta "thermoptic" na raiz, o caminho é esse:
-          REQUESTS_CA_BUNDLE: ${{ github.workspace }}/thermoptic/ssl/rootCA.crt
 
       - name: Stop Thermoptic Proxy
         if: always()
