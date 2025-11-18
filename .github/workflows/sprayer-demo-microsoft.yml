@@ -1,4 +1,4 @@
-name: Sprayer Demo
+name: Sprayer 
  
 on:
   workflow_dispatch:
@@ -30,13 +30,7 @@ jobs:
           
           echo "[+] Proxy Thermoptic iniciado"
           docker compose ps
-          sleep 15
-          echo "insecure and proxied"
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 --insecure https://ja4db.com/id/ja4h/ || echo "curl insecure proxied failed"
-          echo "proxied"
-          curl --proxy http://changeme:changeme@127.0.0.1:1234 https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
-          echo "normal"
-          curl  https://ja4db.com/id/ja4h/ || echo "curl ja4 failed"
+          sleep 5
       
       - name: Run Sprayer
         run: python3 sprayer.py
