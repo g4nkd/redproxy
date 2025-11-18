@@ -17,7 +17,7 @@ catcher_uses_TLS_str = os.getenv("CATCHERTLS")
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
 def send_login_request():
-    url = "http://18.234.239.10:1234/test/"
+    url = "https://cloudflare.manfredi.io/test/"
     post_headers = {
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
@@ -25,11 +25,9 @@ def send_login_request():
     }
 
     try:
-        # A requisição de login está usando GET, mantido como no original.
         response = requests.get(
             url,
             headers=post_headers,
-            # ATENÇÃO: Proxy hardcoded com credenciais de placeholder (changeme) - Mudar!
             proxies={"https": "http://changeme:changeme@127.0.0.1:1234"},
             timeout=5,
         )
