@@ -33,7 +33,9 @@ jobs:
           sleep 15
           
           curl --proxy http://changeme:changeme@127.0.0.1:1234 --cacert ssl/rootCA.crt https://ja4db.com/id/ja4h/
-      
+          echo "listing /thermoptic/ssl/rootCA.crt" ; ls /thermoptic/ssl/rootCA.crt
+          echo "listing /" ; ls /
+     
       - name: Run Sprayer
         run: python3 sprayer.py
         env:
