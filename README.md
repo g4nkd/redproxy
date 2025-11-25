@@ -11,12 +11,12 @@ A research-focused tool designed for security testing, capable of simulating mul
 
 Supports:
 
-* IP Rotation (via GitHub Actions)
+* IP Rotation (via GitHub Actions) - [git-rotate](https://github.com/dunderhay/git-rotate/tree/main)
 * Bypass WebDriver Detection
-* JA4 (TLS fingerprint) - thermoptic
-* JA4H (HTTP fingerprint) - thermoptic
-* JA4X (X509 certificate fingerprint) - thermoptic
-* JA4T (TCP fingerprint) - thermoptic
+* JA4 (TLS fingerprint) - [thermoptic](https://github.com/mandatoryprogrammer/thermoptic/tree/main)
+* JA4H (HTTP fingerprint) - [thermoptic](https://github.com/mandatoryprogrammer/thermoptic/tree/main)
+* JA4X (X509 certificate fingerprint) - [thermoptic](https://github.com/mandatoryprogrammer/thermoptic/tree/main)
+* JA4T (TCP fingerprint) - [thermoptic](https://github.com/mandatoryprogrammer/thermoptic/tree/main)
 
 ### Overview
 <img width="897" height="590" alt="image" src="https://github.com/user-attachments/assets/34bf7a76-d99d-4a00-9a10-3324f8c3027c" />
