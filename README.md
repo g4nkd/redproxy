@@ -12,7 +12,8 @@ A research-focused tool designed for security testing, capable of simulating mul
 Supports:
 
 * IP Rotation (via GitHub Actions) 
-* Bypass WebDriver Detection
+* Bypass Javascript Bot Detection:
+  * WebDriver 
 * JA4 (TLS fingerprint)
 * JA4H (HTTP fingerprint)
 * JA4X (X509 certificate fingerprint)
