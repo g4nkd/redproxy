@@ -1,4 +1,4 @@
-name: Sprayer 
+name: View IP Rotating and JA4 
  
 on:
   workflow_dispatch:
