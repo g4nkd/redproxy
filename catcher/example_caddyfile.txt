@@ -1,4 +1,4 @@
-example.com {
+YourIPorDomain.com {
     header {
         -Server
     }
@@ -12,6 +12,6 @@ example.com {
     }
 
     handle {
-        reverse_proxy localhost:20000
+        reverse_proxy localhost:20005
     }
 }
