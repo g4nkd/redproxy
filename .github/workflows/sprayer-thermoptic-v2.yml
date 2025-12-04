@@ -1,4 +1,4 @@
-name: Sprayer rrereaae
+name: Sprayer
  
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
           python-version: '3.x'
       
       - name: Install dependencies
-        run: python3 -m pip install -r requirements.txt
+        run: python3 -m pip install -r sprayer/requirements.txt
       
       - name: Clone and Start Thermoptic Proxy
         run: |
