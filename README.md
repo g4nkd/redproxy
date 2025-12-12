@@ -13,7 +13,8 @@ Supports:
 
 * IP Rotation (via GitHub Actions) 
 * Bypass Javascript Bot Detection:
-  * WebDriver 
+  * WebDriver
+  * Common Window Size
 * JA4 (TLS fingerprint)
 * JA4H (HTTP fingerprint)
 * JA4X (X509 certificate fingerprint)
