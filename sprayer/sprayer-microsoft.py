@@ -10,13 +10,10 @@ if missing_env_vars:
     missing_vars_str = ", ".join(missing_env_vars)
     raise ValueError(f"Missing environment variables: {missing_vars_str}")
 
-# TODO: add target and other data here later to make this more modular
-# Fetch environment variables
 usernames = os.getenv("USERNAMES").split(',')
 password = os.getenv("PASSWORD")
 catcher_URL = os.getenv("CATCHERURL")
 catcher_uses_TLS_str = os.getenv("CATCHERTLS")
-# Convert catcher_uses_TLS_str to boolean
 catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
 
 def send_login_request(username, password):
