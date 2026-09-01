@@ -1,8 +1,3 @@
-blinker
-click
-colorama
-Flask
-itsdangerous
-Jinja2
-MarkupSafe
-Werkzeug
+flask>=3.0
+colorama>=0.4
+requests>=2.31

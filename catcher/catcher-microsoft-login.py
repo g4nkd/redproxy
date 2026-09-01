@@ -1,181 +1,202 @@
-# Oficial Git-Rotate catcher - https://github.com/dunderhay/git-rotate/blob/main/catcher/catcher.py
+"""
+Redproxy Catcher — receives spray results from GitHub Actions workers.
+
+Supports Microsoft AADSTS error parsing and generic result logging.
+Writes structured JSON output alongside human-readable colored console logs.
+"""
 import os
+import sys
+import json
+import signal
 import threading
-import logging
 from datetime import datetime
-from colorama import Fore, Style
+from pathlib import Path
+
 from flask import Flask, request, jsonify
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from lib.common import setup_logging, log, LogLevel, save_results
+from lib.targets.microsoft import AADSTS_CODES
 
 app = Flask(__name__)
+logger = setup_logging("catcher")
 
-log_directory = "output"
-if not os.path.exists(log_directory):
-    os.makedirs(log_directory)
+_lock = threading.Lock()
+stats = {
+    "total": 0,
+    "valid_creds": 0,
+    "valid_users": 0,
+    "locked": 0,
+    "not_found": 0,
+    "mfa": 0,
+    "errors": 0,
+    "workers": 0,
+}
 
-logging.basicConfig(filename=os.path.join(log_directory, 'full.log'), level=logging.INFO, format='[%(asctime)s %(levelname)s] %(message)s')
 
-def log_message(message, color=None):
-    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    if color:
-        print(f"[{timestamp}] {color}{message}{Style.RESET_ALL}")
+def process_microsoft_result(result: dict):
+    """Parse and log a Microsoft spray result."""
+    username = result.get("username", "?")
+    password = result.get("password", "?")
+    code = result.get("status_code", 0)
+    response = result.get("response", "")
+
+    with _lock:
+        stats["total"] += 1
+
+    parsed = {
+        "username": username,
+        "password": password,
+        "status_code": code,
+        "timestamp": datetime.utcnow().isoformat(),
+        "verdict": "unknown",
+    }
+
+    if code == 200:
+        log(logger, f"[+] SUCCESS {username} : {password}", LogLevel.SUCCESS)
+        parsed["verdict"] = "success"
+        with _lock:
+            stats["valid_creds"] += 1
+        save_results([parsed], filename="valid_creds.json")
+        return
+
+    for aadsts_code, (verdict, detail) in AADSTS_CODES.items():
+        if aadsts_code in response:
+            parsed["verdict"] = verdict
+            parsed["detail"] = detail
+
+            if "VALID CREDS" in detail:
+                log(logger, f"[+] {username} : {password} — {detail}", LogLevel.SUCCESS)
+                with _lock:
+                    stats["valid_creds"] += 1
+                save_results([parsed], filename="valid_creds.json")
+            elif verdict == "invalid_password":
+                log(logger, f"[*] Valid user, wrong password: {username}", LogLevel.INFO)
+                with _lock:
+                    stats["valid_users"] += 1
+            elif verdict == "account_locked":
+                log(logger, f"[!] LOCKED: {username}", LogLevel.ERROR)
+                with _lock:
+                    stats["locked"] += 1
+            elif verdict == "user_not_found":
+                log(logger, f"[-] Not found: {username}", LogLevel.DEBUG)
+                with _lock:
+                    stats["not_found"] += 1
+            elif "mfa" in verdict:
+                log(logger, f"[+] {username} : {password} — {detail}", LogLevel.WARNING)
+                with _lock:
+                    stats["mfa"] += 1
+                save_results([parsed], filename="valid_creds.json")
+            else:
+                log(logger, f"[!] {username} — {detail}", LogLevel.WARNING)
+
+            save_results([parsed], filename="all_results.json")
+            return
+
+    log(logger, f"[?] Unknown response for {username}: {response[:100]}", LogLevel.WARNING)
+    parsed["verdict"] = "unknown"
+    parsed["raw_response"] = response[:500]
+    with _lock:
+        stats["errors"] += 1
+    save_results([parsed], filename="all_results.json")
+
+
+def process_generic_result(result: dict):
+    """Process results from non-Microsoft targets."""
+    username = result.get("username", "N/A")
+    code = result.get("status_code", 0)
+    verdict = result.get("verdict", "unknown")
+
+    with _lock:
+        stats["total"] += 1
+
+    if result.get("valid_creds"):
+        log(logger, f"[+] VALID: {username} — {verdict}", LogLevel.SUCCESS)
+        with _lock:
+            stats["valid_creds"] += 1
+        save_results([result], filename="valid_creds.json")
     else:
-        print(f"[{timestamp}] {message}")
+        log(logger, f"[-] {username} — {verdict} (HTTP {code})", LogLevel.DEBUG)
 
-    logging.info(f"{message}")
-
-
-# When a POST message is received by web server, process the data
-def process_response(username, password, response_code, response):
-    if response_code == 200:
-        log_message(
-            f"[+] {username} : {password}",
-            color=Fore.GREEN,
-        )
-    else:
-        # Check for error codes in response
-        # List of Entra ID error codes - https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes
-        if "AADSTS50126" in response:
-            # Standard invalid password
-            log_message(
-                f"[*] Valid user, but invalid password {username} : {password}",
-                color=Fore.CYAN,
-            )
-        elif "AADSTS50055" in response:
-            # User password is expired
-            log_message(
-                f"[+] {username} : {password} - NOTE: The user's password is expired.",
-                color=Fore.GREEN,
-            )
-        elif "AADSTS50079" in response:
-            # Microsoft MFA required but not configured
-            log_message(
-                f"[+] {username} : {password} - NOTE: MFA required but not configured yet.",
-                color=Fore.GREEN,
-            )
-        elif "AADSTS53004" in response:
-            # User should register for multifactor authentication
-            log_message(
-                f"[+] {username} : {password} - NOTE: User needs to complete the MFA registration process.",
-                color=Fore.GREEN,
-            )
-        elif "AADSTS50076" in response:
-            # Microsoft MFA response
-            log_message(
-                f"[+] {username} : {password} - NOTE: The response indicates MFA (Microsoft) is in use.",
-                color=Fore.YELLOW,
-            )
-        elif "AADSTS50158" in response:
-            # Conditional Access response (Based off of limited testing this seems to be the repsonse to DUO MFA)
-            log_message(
-                f"[+] {username} : {password} - NOTE: Conditional access policy (MFA: DUO or other) is in use.",
-                color=Fore.YELLOW,
-            )
-        elif "AADSTS53003" in response:
-            # Conditional Access response - access policy blocks token issuance
-            log_message(
-                f"[+] {username} : {password} - NOTE: Conditional access policy is in place and blocks token issuance.",
-                color=Fore.YELLOW,
-            )
-        elif "AADSTS53000" in response:
-            # Conditional Access response - access policy requires a compliant device
-            log_message(
-                f"[+] {username} : {password} - NOTE: Conditional access policy is in place and requires a compliant device, and the device isn't compliant.",
-                color=Fore.YELLOW,
-            )
-        elif "AADSTS530035" in response:
-            # Access block by security defaults
-            log_message(
-                f"[+] {username} : {password} - NOTE: Access has been blocked by security defaults. The request is deemed unsafe by security defaults policies",
-                color=Fore.YELLOW,
-            )
-        elif "AADSTS50128" in response or "AADSTS50059" in response:
-            # Invalid Tenant Response
-            log_message(
-                f"[-] Tenant for account {username} doesn't exist. Check the domain to make sure they are using Azure/O365 services.",
-                color=Fore.RED,
-            )
-        elif "AADSTS50034" in response:
-            # Invalid Username
-            log_message(
-                f"[-] The user {username} doesn't exist.",
-                color=Fore.RED,
-            )
-        elif "AADSTS500011" in response:
-            # Invalid resource name
-            log_message(
-                f"[!] The resource principal named was not found in the tenant named.",
-                color=Fore.RED,
-            )
-        elif "AADSTS700016" in response:
-            # Invalid application client ID
-            log_message(
-                f"[!] The application wasn't found in the directory/tenant.",
-                color=Fore.RED,
-            )
-        elif "AADSTS50053" in response:
-            # Locked out account or Smart Lockout in place
-            log_message(
-                f"[!] The account {username} appears to be locked.",
-                color=Fore.RED,
-            )
-        elif "AADSTS50057" in response:
-            # Disabled account
-            log_message(
-                f"[!] The account {username} appears to be disabled.",
-                color=Fore.YELLOW,
-            )
-        else:
-            # Unknown errors
-            log_message(
-                f"[!] Got an error we haven't seen yet for user {username}",
-            )
-            log_message(response)
+    save_results([result], filename="all_results.json")
 
 
 @app.route("/wow-amazing", methods=["POST"])
 def handle_post_data():
-    data = request.get_json()
-    
-    # Check if data is a list of results
-    if isinstance(data, list):
-        for result in data:
-            username = result.get("username")
-            password = result.get("password")
-            login_response_code = result.get("status_code")
-            login_response = result.get("response")
+    """Receive spray results from workers."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
 
-            # Start a new thread to process each response asynchronously
-            threading.Thread(
-                target=process_response,
-                args=(
-                    username,
-                    password,
-                    login_response_code,
-                    login_response,
-                ),
-            ).start()
-    else:
-        # Handle single result (fallback if data is not a list)
-        username = data.get("username")
-        password = data.get("password")
-        login_response_code = data.get("status_code")
-        login_response = data.get("response")
+    with _lock:
+        stats["workers"] += 1
 
-        # Start a new thread to process the response asynchronously
-        threading.Thread(
-            target=process_response,
-            args=(
-                username,
-                password,
-                login_response_code,
-                login_response,
-            ),
-        ).start()
+    results = data if isinstance(data, list) else [data]
 
-    result = {"message": "Data received and processed successfully"}
-    return jsonify(result)
+    for result in results:
+        target = result.get("target", "microsoft")
+        if target == "microsoft" or "response" in result:
+            process_microsoft_result(result)
+        else:
+            process_generic_result(result)
+
+    return jsonify({
+        "status": "ok",
+        "processed": len(results),
+        "stats": dict(stats),
+    })
+
+
+@app.route("/stats", methods=["GET"])
+def get_stats():
+    """Return current statistics."""
+    return jsonify(dict(stats))
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "running", "stats": dict(stats)})
+
+
+def print_summary():
+    """Print final summary on shutdown."""
+    log(logger, "\n" + "=" * 50, LogLevel.INFO)
+    log(logger, "FINAL RESULTS SUMMARY", LogLevel.INFO)
+    log(logger, "=" * 50, LogLevel.INFO)
+    log(logger, f"Total attempts:  {stats['total']}", LogLevel.INFO)
+    log(logger, f"Valid creds:     {stats['valid_creds']}", LogLevel.SUCCESS)
+    log(logger, f"Valid users:     {stats['valid_users']}", LogLevel.INFO)
+    log(logger, f"MFA enforced:    {stats['mfa']}", LogLevel.WARNING)
+    log(logger, f"Locked accounts: {stats['locked']}", LogLevel.ERROR)
+    log(logger, f"Not found:       {stats['not_found']}", LogLevel.DEBUG)
+    log(logger, f"Errors:          {stats['errors']}", LogLevel.ERROR)
+    log(logger, f"Workers:         {stats['workers']}", LogLevel.INFO)
+    log(logger, "=" * 50, LogLevel.INFO)
+
+    if stats["valid_creds"] > 0:
+        log(logger, "\n[!] Check output/valid_creds.json for valid credentials!", LogLevel.SUCCESS)
+
+
+def signal_handler(sig, frame):
+    print_summary()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=20005)
+    import argparse
+    parser = argparse.ArgumentParser(description="Redproxy Catcher — spray results receiver")
+    parser.add_argument("-p", "--port", type=int, default=20005, help="Listen port (default: 20005)")
+    parser.add_argument("--host", default="0.0.0.0", help="Listen host (default: 0.0.0.0)")
+    args = parser.parse_args()
+
+    log(logger, f"Catcher listening on {args.host}:{args.port}", LogLevel.SUCCESS)
+    log(logger, f"Endpoint: POST /wow-amazing", LogLevel.INFO)
+    log(logger, f"Stats:    GET  /stats", LogLevel.INFO)
+    log(logger, f"Output:   output/valid_creds.json, output/all_results.json", LogLevel.INFO)
+
+    app.run(host=args.host, port=args.port, threaded=True)
